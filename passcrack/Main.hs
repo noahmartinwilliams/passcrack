@@ -5,9 +5,11 @@ import Data.List
 import System.IO
 import System.Environment
 import Data.Bits
+import Data.ByteString.Lazy.Internal as BSL
 import Data.ByteString as BS
 import Prelude as P
 import Data.Word
+import Data.String
 
 passwords :: String -> [String]
 passwords str = intern [(str !! 0)] str  where
@@ -50,11 +52,21 @@ hex2nibble 'C' = 12
 hex2nibble 'D' = 13
 hex2nibble 'E' = 14
 hex2nibble 'F' = 15
+hex2nibble 'a' = 10
+hex2nibble 'b' = 11
+hex2nibble 'c' = 12
+hex2nibble 'd' = 13
+hex2nibble 'e' = 14
+hex2nibble 'f' = 15
 
-hex2bits :: String -> ByteString
+hex2bits :: String -> BS.ByteString
 hex2bits [] = empty
 hex2bits ( f : s : rest ) = do
     BS.append (BS.singleton (((hex2nibble f) `shiftL` 4) .|. (hex2nibble s) )) (hex2bits rest)
+
+test :: BS.ByteString -> String -> (Bool, String)
+test hex str = do
+    (((hashlazy (fromString str)) == hex), str)
 
 main :: IO ()
 main = do
@@ -62,6 +74,6 @@ main = do
     args <- getArgs
     let target = hex2bits (args P.!! 0)
         pws = passwords "abcdefghijklmnopqrstuvwxyz"
-        outputs = P.map (\x -> x P.++ "\n") pws
-        outStr = P.foldr (P.++) "" outputs
-    System.IO.putStr outStr
+        filtered = P.filter (\(x, _) -> x == True) (P.map (\x -> test target x) pws)
+        (_, result) = filtered P.!! 0
+    System.IO.putStr result
