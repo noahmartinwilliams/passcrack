@@ -78,16 +78,12 @@ test :: BS.ByteString -> String -> (Bool, String)
 test hex str = do
     (((hashlazy (fromString str)) == hex), str)
 
-buffer :: Int -> Strategy a -> [a] -> [a]
-buffer _ _ [] = []
-buffer numCores strat list = let list2 = P.take numCores (list `using` evalListN numCores strat) in let list3 = P.drop numCores list in list2 ++ (buffer numCores strat list3)
-
 main :: IO ()
 main = do
     hSetBuffering stdout LineBuffering
     args <- getArgs
     let target = hex2bits (args P.!! 0)
-        pws = passwords "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`~!@#$%^&*()_-+=[]{}|\\\"'/?.>,< "
+        pws = passwords "abcdefghijklmnopqrstuvwxyz"
         answers = P.map (\x -> test target x) pws `using` parBuffer numCapabilities rdeepseq
         filtered = P.filter (\(x, _) -> x == True) answers
         (_, result) = filtered P.!! 0
