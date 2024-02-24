@@ -47,6 +47,7 @@ executables:
     dependencies:
     - cryptohash-sha256
     - bytestring
+    - parallel
 
 tests:
   passcrack-test:

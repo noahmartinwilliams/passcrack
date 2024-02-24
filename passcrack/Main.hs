@@ -1,3 +1,9 @@
+{- 
+This program is meant to demonstrate how to use the haskell parallel library to easily parallelize work done via lazily generated lists. 
+It takes as an argument a sha256 checksum (as a hexadecimal string) and tries to find a password that would crack it (note: this does not deal with salts though).
+If you don't know what that means then watch this video (How NOT to Store Passwords! by computerphile on youtube): https://www.youtube.com/watch?v=8ZtInClXe1Q 
+-}
+
 module Main (main) where
 
 import Crypto.Hash.SHA256
@@ -10,6 +16,8 @@ import Data.ByteString as BS
 import Prelude as P
 import Data.Word
 import Data.String
+import Control.Parallel.Strategies
+import GHC.Conc
 
 passwords :: String -> [String]
 passwords str = intern [(str !! 0)] str  where
@@ -18,21 +26,23 @@ passwords str = intern [(str !! 0)] str  where
         let next = incrementChar prev chars
         prev : (intern next chars)
 
+    atEnd :: String -> String -> Bool
+    atEnd input chars = (getPos (input !! 0) chars 0 ) == ((P.length chars) - 1)
+
     incrementChar :: String -> String -> String
     incrementChar input chars | (P.length input) == 0 = [(chars !! 0)]
+    incrementChar input chars | atEnd input chars = do
+        let (_ : rest) = input 
+        ( chars !! 0 ) : (incrementChar rest chars)
     incrementChar input chars = do
         let firstInputCharPos = getPos (input !! 0) chars 0
             (_ : rest) = input
-        if firstInputCharPos == ((P.length chars) - 1) 
-        then
-            (chars !! 0) : (incrementChar rest chars)
-        else
-           (chars !! (firstInputCharPos + 1)) : rest
+        (chars !! (firstInputCharPos + 1)) : rest
 
     getPos :: Char -> String -> Int -> Int
     getPos str [] _ = error ("Internal error: getPos called on charset that does not contain first character of input string: \"" P.++ [str] P.++ "\"")
-    getPos c ( h : _ ) x | c == h = x
-    getPos c ( _ : r ) x = getPos c r (x + 1)
+    getPos char ( h : _ ) x | char == h = x
+    getPos char ( _ : r ) x = getPos char r (x + 1)
         
 
 hex2nibble :: Char -> Word8
@@ -68,12 +78,17 @@ test :: BS.ByteString -> String -> (Bool, String)
 test hex str = do
     (((hashlazy (fromString str)) == hex), str)
 
+buffer :: Int -> Strategy a -> [a] -> [a]
+buffer _ _ [] = []
+buffer numCores strat list = let list2 = P.take numCores (list `using` evalListN numCores strat) in let list3 = P.drop numCores list in list2 ++ (buffer numCores strat list3)
+
 main :: IO ()
 main = do
     hSetBuffering stdout LineBuffering
     args <- getArgs
     let target = hex2bits (args P.!! 0)
-        pws = passwords "abcdefghijklmnopqrstuvwxyz"
-        filtered = P.filter (\(x, _) -> x == True) (P.map (\x -> test target x) pws)
+        pws = passwords "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`~!@#$%^&*()_-+=[]{}|\\\"'/?.>,< "
+        answers = P.map (\x -> test target x) pws `using` parBuffer numCapabilities rdeepseq
+        filtered = P.filter (\(x, _) -> x == True) answers
         (_, result) = filtered P.!! 0
     System.IO.putStr result
