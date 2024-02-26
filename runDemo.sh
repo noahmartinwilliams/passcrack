@@ -8,8 +8,8 @@ STR="hello"
 CKSUM=$(echo -n "$STR" | sha256sum - | sed 's/^\(.*\)[[:space:]]*-$/\1/g' )
 
 echo "with parallelism: "
-time stack exec passcrack-exe +RTS -N$(nproc) -RTS $CKSUM
+time stack exec --rts-options -N$(nproc)  passcrack-exe $CKSUM
 
 echo "without parallelism:"
-time stack exec passcrack-exe +RTS -N1 -RTS $CKSUM
+time stack exec --rts-options -N1 passcrack-exe $CKSUM
 
