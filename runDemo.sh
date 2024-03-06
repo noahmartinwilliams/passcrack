@@ -1,7 +1,6 @@
 #! /bin/bash
 
 set -e
-stack clean
 stack build -j$(nproc)
 
 STR="hello"

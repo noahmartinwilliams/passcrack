@@ -18,6 +18,7 @@ import Data.Word
 import Data.String
 import Control.Parallel.Strategies
 import GHC.Conc
+import Data.List.Split
 
 passwords :: String -> [String]
 passwords str = intern [(str !! 0)] str  where
@@ -83,8 +84,9 @@ main = do
     hSetBuffering stdout LineBuffering
     args <- getArgs
     let target = hex2bits (args P.!! 0)
-        pws = passwords "abcdefghijklmnopqrstuvwxyz"
-        answers = P.map (\x -> test target x) pws `using` parBuffer numCapabilities rdeepseq
-        filtered = P.filter (\(x, _) -> x == True) answers
+        pws = passwords "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        answers = (P.map (\x -> test target x) pws) 
+        answers2 = (splitEvery 1024 answers) `using` parBuffer numCapabilities rdeepseq
+        filtered = P.filter (\(x, _) -> x == True) (P.foldr (++) [] answers2)
         (_, result) = filtered P.!! 0
     System.IO.putStr result

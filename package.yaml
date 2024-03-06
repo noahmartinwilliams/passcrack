@@ -47,6 +47,7 @@ executables:
     - cryptohash-sha256
     - bytestring
     - parallel
+    - split
 
 tests:
   passcrack-test:
