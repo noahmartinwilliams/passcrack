@@ -20,17 +20,13 @@ import Control.Parallel.Strategies
 import GHC.Conc
 import Data.List.Split
 
-passwords :: String -> [String]
-passwords str = intern [0] ((P.length str) - 1) str  where
-    toString :: [Int] -> String -> String
-    toString [] _ = ""
-    toString ( h : t ) str = let c = str !! h in c : (toString t str)
+passwordInts :: Int -> [[Int]] 
+passwordInts clength = intern [0] (clength - 1) where
 
-    intern :: [Int] -> Int -> String -> [String]
-    intern prev clength chars = do
+    intern :: [Int] -> Int -> [[Int]]
+    intern prev clength = do
         let next = incrementChar prev clength
-            str = toString prev chars
-        str : (intern next clength chars)
+        prev : (intern next clength )
 
     incrementChar :: [Int] -> Int -> [Int]
     incrementChar [] _ = [0]
@@ -71,14 +67,19 @@ test :: BS.ByteString -> String -> (Bool, String)
 test hex str = do
     (((hash (fromString str)) == hex), str)
 
+password :: [Int] -> String -> String
+password [] _ = ""
+password ( h : t ) chars = ( chars !! h ) : ( password t chars )
+
 main :: IO ()
 main = do
     hSetBuffering stdout LineBuffering
     args <- getArgs
     let target = hex2bits (args P.!! 0)
-        pws = passwords "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        answers = (P.map (\x -> test target x) pws) 
-        answers2 = (chunksOf 1024 answers) `using` parBuffer numCapabilities rdeepseq
+        chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        pws = passwordInts (P.length chars)
+        answers = (P.map (\x -> test target (password x chars)) pws) 
+        answers2 = (chunksOf 512 answers) `using` parBuffer numCapabilities rdeepseq
         filtered = P.filter (\(x, _) -> x == True) (P.foldr (++) [] answers2)
         (_, result) = filtered P.!! 0
     System.IO.putStr result
