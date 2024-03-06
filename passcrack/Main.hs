@@ -21,29 +21,21 @@ import GHC.Conc
 import Data.List.Split
 
 passwords :: String -> [String]
-passwords str = intern [(str !! 0)] str  where
-    intern :: String -> String -> [String]
-    intern prev chars = do
-        let next = incrementChar prev chars
-        prev : (intern next chars)
+passwords str = intern [0] ((P.length str) - 1) str  where
+    toString :: [Int] -> String -> String
+    toString [] _ = ""
+    toString ( h : t ) str = let c = str !! h in c : (toString t str)
 
-    atEnd :: String -> String -> Bool
-    atEnd input chars = (getPos (input !! 0) chars 0 ) == ((P.length chars) - 1)
+    intern :: [Int] -> Int -> String -> [String]
+    intern prev clength chars = do
+        let next = incrementChar prev clength
+            str = toString prev chars
+        str : (intern next clength chars)
 
-    incrementChar :: String -> String -> String
-    incrementChar input chars | (P.length input) == 0 = [(chars !! 0)]
-    incrementChar input chars | atEnd input chars = do
-        let (_ : rest) = input 
-        ( chars !! 0 ) : (incrementChar rest chars)
-    incrementChar input chars = do
-        let firstInputCharPos = getPos (input !! 0) chars 0
-            (_ : rest) = input
-        (chars !! (firstInputCharPos + 1)) : rest
-
-    getPos :: Char -> String -> Int -> Int
-    getPos str [] _ = error ("Internal error: getPos called on charset that does not contain first character of input string: \"" P.++ [str] P.++ "\"")
-    getPos char ( h : _ ) x | char == h = x
-    getPos char ( _ : r ) x = getPos char r (x + 1)
+    incrementChar :: [Int] -> Int -> [Int]
+    incrementChar [] _ = [0]
+    incrementChar ( h : t ) clength | h == clength = 0 : (incrementChar t clength)
+    incrementChar ( h : t ) clength = ( h + 1 ) : t
         
 
 hex2nibble :: Char -> Word8
@@ -77,7 +69,7 @@ hex2bits ( f : s : rest ) = do
 
 test :: BS.ByteString -> String -> (Bool, String)
 test hex str = do
-    (((hashlazy (fromString str)) == hex), str)
+    (((hash (fromString str)) == hex), str)
 
 main :: IO ()
 main = do
@@ -86,7 +78,7 @@ main = do
     let target = hex2bits (args P.!! 0)
         pws = passwords "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
         answers = (P.map (\x -> test target x) pws) 
-        answers2 = (splitEvery 1024 answers) `using` parBuffer numCapabilities rdeepseq
+        answers2 = (chunksOf 1024 answers) `using` parBuffer numCapabilities rdeepseq
         filtered = P.filter (\(x, _) -> x == True) (P.foldr (++) [] answers2)
         (_, result) = filtered P.!! 0
     System.IO.putStr result
