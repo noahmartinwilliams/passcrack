@@ -26,7 +26,7 @@ passwordInts clength = intern [0] (clength - 1) where
     intern :: [Int] -> Int -> [[Int]]
     intern prev clength = do
         let next = incrementChar prev clength
-        prev : (intern next clength )
+        prev : (intern (next `using` (rparWith rdeepseq)) clength )
 
     incrementChar :: [Int] -> Int -> [Int]
     incrementChar [] _ = [0]
@@ -61,7 +61,8 @@ hex2nibble 'f' = 15
 hex2bits :: String -> BS.ByteString
 hex2bits [] = empty
 hex2bits ( f : s : rest ) = do
-    BS.append (BS.singleton (((hex2nibble f) `shiftL` 4) .|. (hex2nibble s) )) (hex2bits rest)
+    let head = BS.singleton (((hex2nibble f) `shiftL` 4) .|. (hex2nibble s) )
+    BS.append head (hex2bits rest)
 
 test :: BS.ByteString -> String -> (Bool, String)
 test hex str = do
@@ -69,7 +70,7 @@ test hex str = do
 
 password :: [Int] -> String -> String
 password [] _ = ""
-password ( h : t ) chars = ( chars !! h ) : ( password t chars )
+password ( h : t ) chars = let first = ( chars !! h ) in (first `using` (rparWith rdeepseq)) : ( password t chars )
 
 main :: IO ()
 main = do
@@ -79,7 +80,7 @@ main = do
         chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
         pws = passwordInts (P.length chars)
         answers = (P.map (\x -> test target (password x chars)) pws) 
-        answers2 = (chunksOf 512 answers) `using` parBuffer numCapabilities rdeepseq
+        answers2 = (chunksOf 100 answers) `using` parBuffer numCapabilities rdeepseq
         filtered = P.filter (\(x, _) -> x == True) (P.foldr (++) [] answers2)
         (_, result) = filtered P.!! 0
     System.IO.putStr result
